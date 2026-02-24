@@ -48,8 +48,13 @@ export default function App() {
         setTotalPages(data.pagination.totalPages || 1);
         setCurrentPage(data.pagination.page || 1);
       }
-    } catch (error) {
+
+      if (!data.boxes || data.boxes.length === 0) {
+        console.warn('No boxes returned from API. This might be due to Supabase RLS policies blocking access.');
+      }
+    } catch (error: any) {
       console.error('Failed to fetch boxes:', error);
+      setSetupError(error.message || 'Failed to connect to the server. Please check your connection.');
       setBoxes([]);
     } finally {
       setIsLoading(false);

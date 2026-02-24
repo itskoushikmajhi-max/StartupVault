@@ -9,6 +9,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Supabase Configuration
 const supabaseUrl = process.env.SUPABASE_URL || "https://qrhcoaujvlbzwtscftyn.supabase.co";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "sb_publishable_Wi0D46kgiYXEdS0wOjgY7Q_CV-1iY9k";
+
+if (!process.env.SUPABASE_URL || (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_ANON_KEY)) {
+  console.warn("⚠️  Supabase environment variables are missing. Using fallback credentials which may not work for your project.");
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function seedDatabase() {
@@ -18,6 +23,7 @@ async function seedDatabase() {
       .select('*', { count: 'exact', head: true });
 
     if (error) {
+      console.error("❌ Supabase connection error during seeding:", error.message);
       if (error.message.includes('relation "boxes" does not exist') || 
           error.message.includes('schema cache')) {
         console.warn("⚠️  Supabase Table Missing: The 'boxes' table does not exist yet.");
@@ -42,8 +48,6 @@ async function seedDatabase() {
         console.log("- email: text");
         console.log("- payment_amount: numeric (default: 100)");
         console.log("- created_at: timestamptz (default: now())");
-      } else {
-        console.error("Error checking boxes table:", error.message);
       }
       return;
     }
@@ -220,18 +224,21 @@ async function startServer() {
 
         if (seedError) {
           console.error("Seeding failed during fetch:", seedError.message);
-        } else {
-          return res.json({
-            boxes: newBoxes,
-            occupied: 0,
-            pagination: {
-              page: 1,
-              limit: 100,
-              total: 100,
-              totalPages: 1
-            }
+          return res.status(500).json({ 
+            error: `Table 'boxes' is empty and auto-seeding failed: ${seedError.message}. Please ensure your SUPABASE_SERVICE_ROLE_KEY is set correctly.` 
           });
         }
+        
+        return res.json({
+          boxes: newBoxes,
+          occupied: 0,
+          pagination: {
+            page: 1,
+            limit: 100,
+            total: 100,
+            totalPages: 1
+          }
+        });
       }
 
       const { count: occupiedCount, error: occupiedError } = await supabase
