@@ -16,6 +16,8 @@ export default function App() {
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [dashboardAuth, setDashboardAuth] = useState<{ id: number, key: string, box: Box } | null>(null);
+  const [githubUser, setGithubUser] = useState<any>(null);
+  const [userSlots, setUserSlots] = useState<Box[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -58,6 +60,37 @@ export default function App() {
     fetchBoxes(currentPage);
   }, [currentPage]);
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const origin = event.origin;
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+        return;
+      }
+
+      if (event.data?.type === 'GITHUB_AUTH_SUCCESS') {
+        const user = event.data.user;
+        setGithubUser(user);
+        fetchUserSlots(user.id);
+        console.log('GitHub User Connected:', user);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const fetchUserSlots = async (githubId: string | number) => {
+    try {
+      const response = await fetch(`/api/user/slots?github_id=${githubId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserSlots(data.slots || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user slots:', err);
+    }
+  };
+
   const handleBoxClick = (box: Box) => {
     if (box.status === 'active') {
       window.open(box.target_url, '_blank', 'noopener,noreferrer');
@@ -89,6 +122,11 @@ export default function App() {
     setIsDashboardOpen(true);
   };
 
+  const handleManageSlot = (box: Box) => {
+    setDashboardAuth({ id: box.id, key: box.secret_key || '', box });
+    setIsDashboardOpen(true);
+  };
+
   const closeDashboard = () => setIsDashboardOpen(false);
   const closePortal = () => setIsPortalOpen(false);
   const closeAccessModal = () => setIsAccessModalOpen(false);
@@ -98,6 +136,43 @@ export default function App() {
       <SiteHeader />
       
       <main className="flex-grow">
+        {/* GitHub User Profile / My Slots */}
+        {githubUser && (
+          <div className="max-w-[1200px] mx-auto px-4 md:px-8 mt-8">
+            <div className="bg-surface border border-empty p-6 rounded-lg flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <img src={githubUser.avatar_url} alt={githubUser.login} className="w-12 h-12 rounded-full border border-empty" />
+                <div>
+                  <p className="text-xs text-muted uppercase font-black tracking-widest">Connected as</p>
+                  <h3 className="text-lg font-bold text-ink">@{githubUser.login}</h3>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap gap-3">
+                {userSlots.length > 0 ? (
+                  userSlots.map(slot => (
+                    <button
+                      key={slot.id}
+                      onClick={() => handleManageSlot(slot)}
+                      className="px-4 py-2 bg-white border border-empty hover:border-sky text-ink text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2"
+                    >
+                      Manage Slot #{slot.id}
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted italic">You don't own any slots yet.</p>
+                )}
+                <button 
+                  onClick={() => { setGithubUser(null); setUserSlots([]); }}
+                  className="px-4 py-2 text-muted hover:text-ink text-[10px] font-bold uppercase tracking-widest"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="text-center mt-6 mb-8 px-4">
           <div className="inline-block bg-ink/5 px-4 py-2 rounded border border-ink/10">
             <h1 className="font-mono text-sm md:text-base font-medium text-ink tracking-tight">
@@ -217,6 +292,7 @@ export default function App() {
           box={selectedBox} 
           onClose={closePortal} 
           onSuccess={handlePurchaseSuccess}
+          githubUser={githubUser}
         />
       )}
 
@@ -224,17 +300,20 @@ export default function App() {
         isOpen={isAccessModalOpen}
         onClose={closeAccessModal}
         onAuth={handleAuthSuccess}
+        onGithubAuth={(user) => setGithubUser(user)}
       />
 
       {isDashboardOpen && dashboardAuth && (
         <UserDashboard 
           boxId={dashboardAuth.id}
           secretKey={dashboardAuth.key}
+          githubId={githubUser?.id}
           initialData={dashboardAuth.box}
           onClose={closeDashboard}
           onUpdate={(updatedBox) => {
             setBoxes(prev => prev.map(b => b.id === updatedBox.id ? updatedBox : b));
             fetchBoxes(currentPage);
+            if (githubUser) fetchUserSlots(githubUser.id);
           }}
         />
       )}

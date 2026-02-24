@@ -8,12 +8,13 @@ import { FormError } from './FormError';
 interface UserDashboardProps {
   boxId: number;
   secretKey: string;
+  githubId?: string | number;
   initialData: Box;
   onClose: () => void;
   onUpdate: (updatedBox: Box) => void;
 }
 
-export const UserDashboard: React.FC<UserDashboardProps> = ({ boxId, secretKey, initialData, onClose, onUpdate }) => {
+export const UserDashboard: React.FC<UserDashboardProps> = ({ boxId, secretKey, githubId, initialData, onClose, onUpdate }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -36,6 +37,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ boxId, secretKey, 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           secret_key: secretKey,
+          github_id: githubId,
           ...formData
         })
       });

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Key, Hash, ArrowRight, Loader2 } from 'lucide-react';
+import { X, Key, Hash, ArrowRight, Loader2, Github } from 'lucide-react';
 import { FormError } from './FormError';
 import { Box } from '../types';
 
@@ -8,13 +8,45 @@ interface ManageAccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAuth: (id: number, key: string, box: Box) => void;
+  onGithubAuth?: (user: any) => void;
 }
 
-export const ManageAccessModal: React.FC<ManageAccessModalProps> = ({ isOpen, onClose, onAuth }) => {
+export const ManageAccessModal: React.FC<ManageAccessModalProps> = ({ isOpen, onClose, onAuth, onGithubAuth }) => {
   const [id, setId] = useState('');
   const [key, setKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGithubLoading, setIsGithubLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleGithubLogin = async () => {
+    setIsGithubLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/auth/github/url');
+      if (!response.ok) throw new Error('Failed to get auth URL');
+      const { url } = await response.json();
+
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const authWindow = window.open(
+        url,
+        'github_oauth',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      if (!authWindow) {
+        setError('Popup blocked. Please allow popups for this site.');
+        setIsGithubLoading(false);
+      }
+    } catch (err) {
+      console.error('GitHub login error:', err);
+      setError('Failed to initiate GitHub login.');
+      setIsGithubLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,6 +161,29 @@ export const ManageAccessModal: React.FC<ManageAccessModalProps> = ({ isOpen, on
                     <ArrowRight size={16} />
                   </>
                 )}
+              </button>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-empty"></div>
+                </div>
+                <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
+                  <span className="px-2 bg-white text-muted">Or continue with</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGithubLogin}
+                disabled={isGithubLoading}
+                className="w-full h-[52px] bg-white text-ink border border-empty font-bold text-[14px] tracking-[0.05em] uppercase hover:border-ink transition-all duration-200 flex items-center justify-center gap-2 active:translate-y-[1px] disabled:opacity-50"
+              >
+                {isGithubLoading ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <Github size={18} />
+                )}
+                GitHub
               </button>
             </form>
           </motion.div>

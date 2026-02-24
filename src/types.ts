@@ -9,6 +9,8 @@ export interface Box {
   logo_url?: string;
   target_url?: string;
   inventor_name?: string;
+  secret_key?: string;
+  github_id?: string;
   created_at: string;
 }
 

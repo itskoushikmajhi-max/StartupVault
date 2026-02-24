@@ -9,9 +9,10 @@ interface BuyingPortalProps {
   box: Box | null;
   onClose: () => void;
   onSuccess: (newBox: Box) => void;
+  githubUser?: any;
 }
 
-export const BuyingPortal: React.FC<BuyingPortalProps> = ({ box, onClose, onSuccess }) => {
+export const BuyingPortal: React.FC<BuyingPortalProps> = ({ box, onClose, onSuccess, githubUser }) => {
   const [step, setStep] = useState(1);
   const [secretKey, setSecretKey] = useState<string | null>(null);
   const [purchasedBox, setPurchasedBox] = useState<Box | null>(null);
@@ -98,7 +99,8 @@ export const BuyingPortal: React.FC<BuyingPortalProps> = ({ box, onClose, onSucc
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: box.id,
-          ...formData
+          ...formData,
+          github_id: githubUser?.id
         })
       });
 
