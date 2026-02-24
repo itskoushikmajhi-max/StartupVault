@@ -196,21 +196,19 @@ async function startServer() {
         .range(from, to);
 
       if (error) {
-        if (error.code === 'PGRST116' || 
-            error.message.includes('relation "boxes" does not exist') ||
-            error.message.includes('schema cache')) {
-          return res.status(200).json({ 
-            boxes: [], 
-            occupied: 0, 
-            pagination: { page: 1, limit: 100, total: 0, totalPages: 0 },
-            error: "Table 'boxes' does not exist in Supabase. Please create it with columns: id (int8), status (text), secret_key (text), startup_name (text), tagline (text), category (text), logo_url (text), target_url (text), inventor_name (text), created_at (timestamptz)."
-          });
-        }
-        throw error;
+        console.error("Supabase error fetching boxes:", error.message);
+        return res.status(200).json({ 
+          boxes: [], 
+          occupied: 0, 
+          pagination: { page: 1, limit: 100, total: 0, totalPages: 0 },
+          setupRequired: true,
+          errorType: error.message.includes('relation "boxes" does not exist') ? "TABLE_MISSING" : "CONNECTION_ERROR",
+          message: error.message
+        });
       }
 
       // If table exists but is empty, seed it now
-      if (count === 0 && page === 1) {
+      if ((!boxes || boxes.length === 0) && page === 1) {
         console.log("Table 'boxes' is empty. Seeding 100 boxes...");
         const seedData = Array.from({ length: 100 }, (_, i) => ({
           id: i + 1,
@@ -224,8 +222,13 @@ async function startServer() {
 
         if (seedError) {
           console.error("Seeding failed during fetch:", seedError.message);
-          return res.status(500).json({ 
-            error: `Table 'boxes' is empty and auto-seeding failed: ${seedError.message}. Please ensure your SUPABASE_SERVICE_ROLE_KEY is set correctly.` 
+          return res.status(200).json({ 
+            boxes: [],
+            occupied: 0,
+            pagination: { page: 1, limit: 100, total: 0, totalPages: 0 },
+            setupRequired: true,
+            errorType: "SEED_FAILED",
+            message: `Table 'boxes' is empty and auto-seeding failed: ${seedError.message}.` 
           });
         }
         
@@ -427,6 +430,26 @@ async function startServer() {
 
       if (error) throw error;
       res.json({ slots });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/seed", async (req, res) => {
+    try {
+      console.log("Manual seeding requested...");
+      const seedData = Array.from({ length: 100 }, (_, i) => ({
+        id: i + 1,
+        status: 'available'
+      }));
+      
+      const { data, error } = await supabase
+        .from('boxes')
+        .upsert(seedData, { onConflict: 'id' })
+        .select();
+
+      if (error) throw error;
+      res.json({ message: "Seeding successful", count: data.length });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
